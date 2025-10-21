@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en" class="theme-light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>DX order maker</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="data:,">
+  <style>
+    :root{--bg:#ffffff;--fg:#0f172a;--muted:#6b7280;--card:#f8fafc;--border:#e5e7eb;--accent:#10b981;--accent-contrast:#ffffff;--pill:#eef2f7;--radius:12px;--shadow:0 2px 10px rgba(0,0,0,.08);--grad-start:#454388; --grad-end:#1b063e}
+    .theme-dark{--bg:#0b0e13;--fg:#e5e7eb;--muted:#9aa0a6;--card:#151923;--border:#2a2f3a;--accent:#34d399;--accent-contrast:#081016;--pill:#0f141d;--shadow:none}
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;font-family:Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;background:var(--bg);color:var(--fg)}
+    input,button,textarea,select,label{font-family:inherit;font-size:16px}
+
+    header{position:sticky;top:0;z-index:70;backdrop-filter:blur(10px);background:color-mix(in srgb,var(--bg) 85%, transparent);border-bottom:1px solid var(--border);padding:10px 14px;display:flex;align-items:center;justify-content:space-between}
+    .title{font-weight:800;letter-spacing:.2px}
+    .toggle{width:48px;height:28px;border-radius:999px;background:var(--pill);border:1px solid var(--border);position:relative;cursor:pointer}
+    .toggle .knob{position:absolute;top:2px;left:2px;width:24px;height:24px;border-radius:999px;background:var(--fg);transition:transform .18s ease}
+    .toggle.on .knob{transform:translateX(20px)}
+
+    main{padding:12px; padding-bottom:200px; max-width:960px; margin:0 auto}
+    input[type="search"],input[type="text"],textarea{width:100%;padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--card);color:var(--fg)}
+    textarea{min-height:60px;resize:vertical}
+
+    .tabs{display:flex;gap:8px;overflow:auto;padding:8px 0}
+    .tab{padding:8px 12px;border-radius:999px;background:var(--pill);border:1px solid var(--border);white-space:nowrap;color:var(--fg);opacity:.95;transition:all .15s ease}
+    .tab.active{background:linear-gradient(180deg,var(--grad-start),var(--grad-end)); color:#fff; border-color:var(--grad-end)}
+
+    .section-title{margin:18px 2px 8px;color:var(--muted);text-transform:uppercase;font-size:12px;font-weight:700;letter-spacing:.08em}
+
+    /* Responsive grid: iPhone 15 (~393px) keeps 2 columns; collapse < 360px */
+    .grid{display:grid;gap:10px;grid-template-columns:repeat(2,minmax(0,1fr))}
+    @media (max-width: 359px){ .grid{grid-template-columns:1fr} }
+
+    /* Card containment + wrapping; slightly tighter spacing for small screens */
+    .card{display:grid;gap:8px;align-items:start;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:8px;box-shadow:var(--shadow);overflow:hidden}
+    .thumb-wrap{border-radius:10px;overflow:hidden;background:#fff}
+    /* Prevent clipping: show full image within box */
+    .thumb{display:block;width:100%;height:auto;max-height:180px;object-fit:contain;object-position:center;background:#fff;cursor:pointer}
+    @media (max-width: 400px){ .thumb{max-height:150px} }
+
+    .item-name{font-weight:800;font-size:14.5px;line-height:1.25;overflow-wrap:anywhere;word-break:break-word}
+    .desc{color:var(--muted);font-size:12.5px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+
+    /* Price line (right aligned) */
+    .price-line{display:flex;justify-content:flex-end;align-items:center}
+    .price{font-weight:800}
+
+    /* Controls: on iPhone 15 we stack rows if needed */
+    .controls-line{display:flex;align-items:center;justify-content:space-between;gap:8px}
+    .note-left{display:flex;align-items:center;gap:8px;min-width:0}
+    .note-toggle{height:36px;padding:0 12px;border-radius:999px;border:1px solid var(--border);background:var(--bg);color:var(--fg);cursor:pointer;white-space:nowrap}
+    .theme-dark .note-toggle{background:var(--card)}
+
+    .actions-right{display:inline-flex;align-items:center;gap:6px;flex-shrink:0}
+    .btn-minus,.btn-plus{width:34px;height:34px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;font-weight:900;font-size:18px}
+    .btn-plus{background:linear-gradient(180deg,var(--grad-start),var(--grad-end)); color:#fff; border:none}
+    .btn-minus{background:#fff; color:#000; border:1px solid var(--border)}
+    .theme-dark .btn-minus{background:#fff; color:#000; border:none}
+    .qty input{width:38px;text-align:center;border:1px solid var(--border);border-radius:10px;background:#fff;color:#000;padding:6px}
+    .theme-dark .qty input{background:var(--card); color:var(--fg); border:1px solid var(--border)}
+    input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+    input[type=number]{-moz-appearance:textfield}
+
+    /* Stack controls on narrow widths so Add note becomes row1, qty row2 */
+    @media (max-width: 430px){
+      .controls-line{flex-direction:column;align-items:stretch}
+      .note-left{width:100%}
+      .note-toggle{width:100%;text-align:left}
+      .actions-right{width:100%;justify-content:flex-end}
+    }
+
+    .note{display:none}
+    .note.open{display:block}
+    .note input{width:100%;padding:10px;border:1px solid var(--border);border-radius:10px;background:#fff;color:var(--fg)}
+    .theme-dark .note input{background:var(--card)}
+
+    .empty{color:var(--muted);padding:16px;text-align:center}
+    .loadingbar{height:4px;width:100%;background:var(--card);border-radius:999px;overflow:hidden;display:none;margin:8px 0 0}
+    .loadingbar .bar{height:100%;width:40%;background:linear-gradient(90deg,var(--grad-start),var(--grad-end));animation:load 1s ease-in-out infinite}
+    @keyframes load{0%{transform:translateX(-100%)}50%{transform:translateX(30%)}100%{transform:translateX(200%)}}
+
+    .footer{position:fixed;left:0;right:0;bottom:0;padding:10px;border-top:1px solid var(--border);background:color-mix(in srgb,var(--bg) 90%, transparent);backdrop-filter:blur(10px);z-index:80}
+    .footer-inner{display:grid;gap:8px}
+    .summary{display:none;align-items:flex-start;justify-content:space-between;gap:10px}
+    .summary .total{font-weight:800}
+    .summary-list{max-height:30vh;overflow:auto;margin-top:8px;border-top:1px dashed var(--border);padding-top:8px}
+    .summary-item{display:flex;align-items:center;justify-content:space-between;font-size:12px;margin:2px 0}
+
+    .cta{width:100%;display:inline-flex;align-items:center;justify-content:center;gap:10px;border:none;padding:14px 16px;border-radius:14px;background: linear-gradient(180deg, var(--grad-start), var(--grad-end)); color:#fff; font-weight:800;font-size:16px}
+    .cta:disabled{opacity:.5}
+    .row{display:flex;gap:10px;flex-wrap:wrap}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="title">DX order maker</div>
+    <div id="themeToggle" class="toggle" aria-label="Toggle theme"><div class="knob"></div></div>
+  </header>
+  <main>
+    <input id="search" type="search" placeholder="Search…" aria-label="Search menu" />
+    <div id="tabs" class="tabs" aria-label="Categories"></div>
+
+    <div class="section-title">Menu</div>
+    <div id="menu" class="grid"></div>
+    <div id="loadingBar" class="loadingbar"><div class="bar"></div></div>
+    <div id="empty" class="empty" style="display:none"></div>
+
+    <div class="section-title">Order details</div>
+    <div class="row" role="group" aria-labelledby="modeLabel">
+      <div id="modeLabel" class="sr-only" style="position:absolute;left:-9999px">Choose dine‑in or takeout</div>
+      <label class="tab"><input type="radio" name="mode" value="Take out"> Take out</label>
+      <label class="tab"><input type="radio" name="mode" value="Dine in"> Dine in</label>
+    </div>
+    <div class="section-title">Name for order</div>
+    <div class="row" style="margin-top:8px"><input id="name" type="text" placeholder="Optional"></div>
+    <div class="section-title">Notes</div>
+    <div class="row" style="margin-top:8px"><textarea id="notes" placeholder="Optional"></textarea></div>
+  </main>
+
+  <div class="footer">
+    <div class="footer-inner">
+      <div id="summary" class="summary">
+        <div id="summaryLeft">
+          <div id="summaryText" class="total">0 items • SAR 0.00</div>
+          <details id="summaryDetails">
+            <summary>Order summary</summary>
+            <div id="summaryList" class="summary-list"></div>
+          </details>
+        </div>
+      </div>
+      <button id="send" class="cta" disabled>Submit through Whatsapp</button>
+    </div>
+  </div>
+
+  <div id="lightbox" style="position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;z-index:999"><img id="lightboxImg" alt="" style="max-width:90vw;max-height:90vh;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.5)"/></div>
+
+  <script>
+    const WORKER = 'https://winter-night-3d3d.umaraa2.workers.dev/?url=';
+    const API_ROOT = 'https://nutrifactsadmin.tamimimarkets.com';
+    const CATEGORIES = '/api/get-category';
+    const ITEMS_POST = '/api/get-category-item';
+    const FORCE_CYCLE = 'cycle1';
+    const WA = '966598943912';
+
+    const savedTheme = localStorage.getItem('theme');
+    const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const initialTheme = savedTheme || (prefersDark ? 'dark' : 'light');
+
+    const S = { items: [], cats: ['All'], cat: 'All', q: '', cart: {}, mode: '', name: '', notes: '', theme: initialTheme };
+
+    const tgl = document.getElementById('themeToggle');
+    function applyTheme(){document.documentElement.classList.toggle('theme-dark', S.theme==='dark');tgl.classList.toggle('on', S.theme==='dark');localStorage.setItem('theme',S.theme)}
+    tgl.addEventListener('click',()=>{S.theme=S.theme==='dark'?'light':'dark';applyTheme()}); applyTheme();
+
+    const $ = s=>document.querySelector(s); const $$ = s=>Array.from(document.querySelectorAll(s));
+    const SAR = v => `SAR ${Number(v).toFixed(2)}`;
+    const loadingBar = document.getElementById('loadingBar');
+    const empty = document.getElementById('empty');
+    const lb = document.getElementById('lightbox'); const lbImg = document.getElementById('lightboxImg');
+
+    async function getJSON(url){ const r=await fetch(WORKER+encodeURIComponent(url)); if(!r.ok) throw new Error('HTTP '+r.status); const j=await r.json(); return j && j.data!==undefined ? j.data : j; }
+    async function postForm(url, form){ const fd = new FormData(); Object.entries(form).forEach(([k,v])=>{ if(v!=='' && v!=null) fd.append(k, v); }); const res = await fetch(WORKER+encodeURIComponent(url), { method:'POST', body:fd }); if(!res.ok) throw new Error('HTTP '+res.status); const j=await res.json(); return j && j.data!==undefined ? j.data : j; }
+
+    (async function init(){
+      try{
+        if(loadingBar) loadingBar.style.display='block';
+        const catsRaw = await getJSON(API_ROOT + CATEGORIES);
+        const cats = normalizeCategories(catsRaw);
+        if(!cats.length) throw new Error('No categories found');
+        const items = [];
+        for(const c of cats){
+          const list = await fetchItemsForCategory(c.id, c.name);
+          if(list.length===0){ console.warn('No items for', c); }
+          items.push(...list);
+        }
+        if(!items.length) throw new Error('Items not found.');
+        S.items = items; S.cats = ['All', ...new Set(items.map(i=>i.category).filter(Boolean))];
+        renderTabs(); renderList();
+      }catch(err){ if(empty){ empty.textContent='Error: '+err.message; empty.style.display='block'; } }
+      finally{ if(loadingBar) loadingBar.style.display='none'; }
+    })();
+
+    async function fetchItemsForCategory(id, catName){
+      const tries = [];
+      if(FORCE_CYCLE) tries.push({category_id:id, cycle:FORCE_CYCLE});
+      tries.push({category_id:id});
+      if(FORCE_CYCLE) tries.push({categoryId:id, cycle:FORCE_CYCLE});
+      tries.push({categoryId:id});
+      for(const body of tries){
+        try{ const data = await postForm(API_ROOT + ITEMS_POST, body); const list = normalizeItems(data, catName); if(list.length){ return list; } }
+        catch(e){ /* try next */ }
+      }
+      return [];
+    }
+
+    function normalizeCategories(json){ const out=[]; walk(json, o=>{ if(!o||typeof o!=='object'||Array.isArray(o)) return; const k=Object.keys(o); const idK=k.find(x=>/^(id|category_id|categoryId|catId|cid)$/i.test(x)); const nmK=k.find(x=>/^(category_name|name|title|label)$/i.test(x)); if(idK && nmK){ out.push({id:String(o[idK]), name:String(o[nmK])}); } }); const seen=new Set(); return out.filter(c=>{const key=c.id+'|'+c.name; if(seen.has(key)) return false; seen.add(key); return true}); }
+
+    function normalizeItems(json, fallbackCat){ const items=[]; walk(json, o=>{ if(!o||typeof o!=='object'||Array.isArray(o)) return; const name=(o.item_name||o.name||o.title||'').toString().trim(); let price=o.price; if(typeof price==='string'){ const m=price.replace(/,/g,'').match(/\d+(?:\.\d+)?/); price = m? parseFloat(m[0]) : NaN; } const category=(o.category_name||fallbackCat||'All').toString().trim()||'All'; const img=o.item_icon||o.image||''; const desc=o.description||''; if(name){ const id='p-'+btoa(unescape(encodeURIComponent(name+'|'+(price||'')+'|'+category))).replace(/=+$/,''); items.push({id,name,price:Number(price)||0,category,img,desc}); } }); return items; }
+
+    function walk(node, fn){ if(node==null) return; if(Array.isArray(node)){ node.forEach(n=>walk(n, fn)); return } if(typeof node==='object'){ try{ fn(node) }catch{} for(const k in node){ try{ walk(node[k], fn) }catch{} } } }
+
+    const tabs=$('#tabs'), listBox=$('#menu'), send=$('#send');
+
+    function renderTabs(){ if(!tabs) return; tabs.innerHTML=''; S.cats.forEach(c=>{ const b=document.createElement('button'); b.className='tab'+(S.cat===c?' active':''); b.textContent=c; b.onclick=()=>{ S.cat=c; renderTabs(); renderList(); }; tabs.appendChild(b); }); }
+
+    $('#search')?.addEventListener('input', e=>{ S.q=e.target.value; renderList(); });
+    document.querySelectorAll('input[name="mode"]').forEach(r=> r.addEventListener('change', e=>{ if(e.target.checked){ S.mode=e.target.value; updateCTA(); }}));
+    $('#name')?.addEventListener('input', e=>{ S.name=e.target.value; updateCTA(); });
+    $('#notes')?.addEventListener('input', e=>{ S.notes=e.target.value; });
+
+    function renderList(){
+      if(!listBox) return;
+      const q=(S.q||'').toLowerCase();
+      const L=S.items.filter(i=> (S.cat==='All'||i.category===S.cat) && (!q||i.name.toLowerCase().includes(q)) );
+      listBox.innerHTML='';
+      if(empty){ empty.style.display=L.length?'none':'block'; if(!L.length) empty.textContent='No items match your search.'; }
+      L.forEach(it=>{
+        const card=document.createElement('div'); card.className='card';
+        const qty=S.cart[it.id]?.qty||0; const note=S.cart[it.id]?.note||'';
+        card.innerHTML = `
+          <div class=\"thumb-wrap\"><img class=\"thumb\" alt=\"${it.name.replace(/"/g,'&quot;')}\" src=\"${it.img}\" data-full=\"${it.img}\"></div>
+          <div class="item-name">${it.name}</div>
+          ${it.desc? `<div class=\"desc\">${it.desc}</div>`:''}
+          <div class="price-line"><div class="price">${SAR(it.price)}</div></div>
+          <div class="controls-line">
+            <div class="note-left"><button class="note-toggle" aria-label="Add note">Add note</button></div>
+            <div class="actions-right">
+              <button class="btn-minus" aria-label="Decrease">−</button>
+              <div class="qty"><input type="number" inputmode="numeric" min="0" value="${qty}"></div>
+              <button class="btn-plus" aria-label="Increase">+</button>
+            </div>
+          </div>
+          <div class="note${note? ' open':''}"><input type="text" placeholder="Add a note" value="${note}"></div>`;
+        const minus = card.querySelector('.btn-minus');
+        const plus  = card.querySelector('.btn-plus');
+        const input = card.querySelector('.qty input');
+        const noteBtn = card.querySelector('.note-toggle');
+        const noteBox = card.querySelector('.note');
+        const noteInput = noteBox.querySelector('input');
+        const img = card.querySelector('.thumb');
+        minus.onclick=()=>{ const v=Math.max(0,(parseInt(input.value||'0',10)||0)-1); input.value=v; setQty(it.id,v); };
+        plus.onclick =()=>{ const v=Math.max(0,(parseInt(input.value||'0',10)||0)+1); input.value=v; setQty(it.id,v); };
+        input.onchange=()=>{ const v=Math.max(0,parseInt(input.value||'0',10)||0); input.value=v; setQty(it.id,v); };
+        noteBtn.onclick=()=>{ noteBox.classList.toggle('open'); };
+        noteInput.oninput=()=> setNote(it.id, noteInput.value);
+        img.onclick = ()=> openLightbox(img.dataset.full || img.src, it.name);
+        listBox.appendChild(card);
+      });
+      updateCTA();
+    }
+
+    function setQty(id,qty){ if(!S.cart[id]) S.cart[id]={qty:0,note:''}; S.cart[id].qty=qty; if(qty===0 && !S.cart[id].note) delete S.cart[id]; updateCTA(); renderSummary(); }
+    function setNote(id,note){ if(!S.cart[id]) S.cart[id]={qty:0,note:''}; S.cart[id].note=note; if((S.cart[id].qty||0)===0 && !note) delete S.cart[id]; renderSummary(); }
+
+    function updateCTA(){ const count=Object.values(S.cart).reduce((a,c)=>a+(c.qty||0),0); if(send) send.disabled = count===0 || !S.mode; renderSummary(); }
+
+    function renderSummary(){
+      const count=Object.values(S.cart).reduce((a,c)=>a+(c.qty||0),0);
+      const total=Object.entries(S.cart).reduce((sum,[id,c])=>{const it=S.items.find(x=>x.id===id); return it? sum+(it.price*(c.qty||0)) : sum},0);
+      const bar=$('#summary'); const text=$('#summaryText'); const list=$('#summaryList'); const details=$('#summaryDetails');
+      if(!bar||!text||!details) return; if(count===0){ bar.style.display='none'; return; }
+      bar.style.display='flex'; text.textContent = `${count} item${count>1?'s':''} • ${SAR(total)}`;
+      if(list){ list.innerHTML = ''; }
+      Object.entries(S.cart).forEach(([id,c])=>{
+        const it=S.items.find(x=>x.id===id); if(!it || (c.qty||0)===0) return;
+        const row=document.createElement('div'); row.className='summary-item';
+        const left=document.createElement('div'); left.textContent = `${it.name} × ${c.qty}` + (c.note? ` — ${c.note}`:'');
+        const right=document.createElement('div'); right.textContent = SAR(it.price*(c.qty||0));
+        row.appendChild(left); row.appendChild(right); list?.appendChild(row);
+      });
+    }
+
+    document.getElementById('send')?.addEventListener('click', ()=>{
+      const lines=[]; lines.push('Hey!','',`Can i please get an order for ${S.mode}`); if(S.name){ lines.push(`Name for the order is ${S.name}`); } lines.push('','Order:','');
+      Object.entries(S.cart).forEach(([id,c])=>{ if((c.qty||0)>0){ const it=S.items.find(x=>x.id===id); if(it){ lines.push(`• ${it.name} × ${c.qty}` + (c.note? ' — '+c.note:'')) } } });
+      if(S.notes){ lines.push('','Notes:', S.notes); }
+      lines.push('','Can you please let me know how long it will take as well?','','Thank you!');
+      const url = `https://wa.me/${WA}?text=${encodeURIComponent(lines.join('\n'))}`;
+      location.href = url;
+    });
+
+    function openLightbox(src, alt){ if(!lb||!lbImg) return; lbImg.src = src || ''; lbImg.alt = alt || ''; lb.style.display='flex'; }
+    lb?.addEventListener('click', ()=>{ lb.style.display='none'; lbImg.src=''; });
+
+    const detailsEl = document.getElementById('summaryDetails');
+    if(detailsEl){
+      document.addEventListener('click', (e)=>{ if(!detailsEl.contains(e.target)) detailsEl.open=false; });
+      window.addEventListener('scroll', ()=>{ detailsEl.open=false; }, { passive:true });
+    }
+  </script>
+</body>
+</html>
